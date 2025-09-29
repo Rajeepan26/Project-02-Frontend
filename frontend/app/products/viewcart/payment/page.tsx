@@ -167,18 +167,41 @@ export default function PaymentPage() {
     return v;
   };
 
+  // Validate expiry date and ensure it's not a previous month/year
+  const validateExpiryField = (expiry: string): string | undefined => {
+    if (!expiry || !expiry.trim()) return 'Expiry date is required';
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) return 'Invalid expiry date format (MM/YY)';
+    const [mmStr, yyStr] = expiry.split('/');
+    const month = parseInt(mmStr, 10);
+    const year = parseInt(yyStr, 10) + 2000; // assume 20YY
+    if (isNaN(month) || isNaN(year) || month < 1 || month > 12) return 'Invalid expiry month';
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-based
+    if (year < currentYear) return 'Invalid month and year';
+    if (year === currentYear && month < currentMonth) return 'Invalid month and year';
+    return undefined;
+  };
+
   // Validate form (only card info now)
   const validateForm = (): boolean => {
     const newErrors: Partial<CardInfo> = {};
     if (!cardInfo.cardNumber.replace(/\s/g, '').trim()) newErrors.cardNumber = 'Card number is required';
     else if (cardInfo.cardNumber.replace(/\s/g, '').length < 16) newErrors.cardNumber = 'Card number must be 16 digits';
-    if (!cardInfo.expiryDate.trim()) newErrors.expiryDate = 'Expiry date is required';
-    else if (!/^\d{2}\/\d{2}$/.test(cardInfo.expiryDate)) newErrors.expiryDate = 'Invalid expiry date format (MM/YY)';
+    const expiryError = validateExpiryField(cardInfo.expiryDate);
+    if (expiryError) newErrors.expiryDate = expiryError;
     if (!cardInfo.cvv.trim()) newErrors.cvv = 'CVV is required';
-    else if (cardInfo.cvv.length < 3) newErrors.cvv = 'CVV must be 3-4 digits';
+    else if (!/^\d{3}$/.test(cardInfo.cvv)) newErrors.cvv = 'CVV must be 3 digits';
     if (!cardInfo.cardholderName.trim()) newErrors.cardholderName = 'Cardholder name is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // Validate CVV field (live)
+  const validateCvvField = (cvv: string): string | undefined => {
+    if (!cvv || !cvv.trim()) return 'CVV is required';
+    if (!/^\d{3}$/.test(cvv)) return 'CVV must be 3 digits';
+    return undefined;
   };
 
   // Handle form submission
@@ -522,8 +545,14 @@ export default function PaymentPage() {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Expiry Date *</label>
                       <input
                         type="text"
+                        inputMode="numeric"
                         value={cardInfo.expiryDate}
-                        onChange={(e) => setCardInfo({...cardInfo, expiryDate: formatExpiryDate(e.target.value)})}
+                        onChange={(e) => {
+                          const formatted = formatExpiryDate(e.target.value);
+                          setCardInfo({...cardInfo, expiryDate: formatted});
+                          const expiryError = validateExpiryField(formatted);
+                          setErrors(prev => ({ ...prev, expiryDate: expiryError }));
+                        }}
                         className={`w-full px-5 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors text-lg bg-slate-50 ${errors.expiryDate ? 'border-red-400' : 'border-slate-200'}`}
                         placeholder="MM/YY"
                         maxLength={5}
@@ -535,12 +564,21 @@ export default function PaymentPage() {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">CVV *</label>
                       <div className="relative">
                         <input
-                          type="text"
+                          type="password"
+                          inputMode="numeric"
                           value={cardInfo.cvv}
-                          onChange={(e) => setCardInfo({...cardInfo, cvv: e.target.value.replace(/\D/g, '')})}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            // limit to 3 digits
+                            const trimmed = digits.slice(0, 3);
+                            setCardInfo({...cardInfo, cvv: trimmed});
+                            // live validate and set error for CVV only
+                            const cvvError = validateCvvField(trimmed);
+                            setErrors(prev => ({ ...prev, cvv: cvvError }));
+                          }}
                           className={`w-full px-5 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors text-lg bg-slate-50 pr-12 ${errors.cvv ? 'border-red-400' : 'border-slate-200'}`}
-                          placeholder="123"
-                          maxLength={4}
+                          placeholder="***"
+                          maxLength={3}
                         />
                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

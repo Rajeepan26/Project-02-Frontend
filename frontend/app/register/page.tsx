@@ -153,11 +153,11 @@ export default function RegisterPage() {
     }
 
     // Phone validation
-    const phoneRegex = /^\+?[\d\s-]{10,}$/;
+    const phoneRegex = /^\+?[\d]{10,13}$/;
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else if (!phoneRegex.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
+      newErrors.phone = 'Please enter a valid phone number (10-13 digits only)';
     }
 
     // Address validation
@@ -224,10 +224,29 @@ export default function RegisterPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-    }));
+    
+    // Special handling for phone number - only allow digits and + at the beginning
+    if (name === 'phone') {
+      // Remove any non-digit characters except + at the beginning
+      let cleanValue = value.replace(/[^\d+]/g, '');
+      // Ensure + is only at the beginning
+      if (cleanValue.includes('+') && !cleanValue.startsWith('+')) {
+        cleanValue = '+' + cleanValue.replace(/\+/g, '');
+      }
+      // Limit to 13 characters
+      if (cleanValue.length > 13) {
+        cleanValue = cleanValue.substring(0, 13);
+      }
+      setFormData(prev => ({
+        ...prev,
+        [name]: cleanValue,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      }));
+    }
   };
 
   // const handleGoogleSignup = () => {
@@ -467,12 +486,13 @@ export default function RegisterPage() {
                           value={formData.phone}
                           onChange={handleChange}
                           disabled={loading}
+                          maxLength={13}
                           className={`block w-full pl-10 pr-3 py-2 rounded-lg border ${
                             errors.phone ? 'border-red-500' : 'border-gray-300'
                           } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                             loading ? 'opacity-50 cursor-not-allowed' : ''
                           } text-black`}
-                          placeholder="+1 (555) 000-0000"
+                          placeholder="+1234567890"
                         />
                       </div>
                       {errors.phone && (

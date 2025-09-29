@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useEffect, useState } from 'react';
 import { getOrdersByStatus, updateOrderStatus } from '@/services/orders';
 import { Card, CardContent } from '@/components/ui/card';
-import { FaClipboardList, FaUser, FaMapMarkerAlt, FaPhone, FaTruck, FaCheckCircle, FaClock, FaExclamationTriangle, FaRoute, FaFilter, FaSearch } from 'react-icons/fa';
+import { FaClipboardList, FaUser, FaMapMarkerAlt, FaPhone, FaTruck, FaCheckCircle, FaExclamationTriangle, FaRoute, FaFilter, FaSearch } from 'react-icons/fa';
 
 interface DeliveryOrder {
   id: string;
@@ -22,6 +22,8 @@ export default function AssignedOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<{ id: string; orderNumber: string; currentStatus: string; newStatus: string } | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -39,19 +41,39 @@ export default function AssignedOrderPage() {
     fetchOrders();
   }, []);
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
-    const confirmMsg = `Are you sure you want to change the status to '${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}'?`;
-    if (!window.confirm(confirmMsg)) return;
+  const handleStatusChange = (orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    setSelectedOrder({
+      id: orderId,
+      orderNumber: order.orderNumber,
+      currentStatus: order.status,
+      newStatus: newStatus
+    });
+    setShowConfirmModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!selectedOrder) return;
+    
     try {
-      await updateOrderStatus(orderId, newStatus);
-      if (newStatus === 'delivered') {
-        setOrders(prev => prev.filter(order => order.id !== orderId));
+      await updateOrderStatus(selectedOrder.id, selectedOrder.newStatus);
+      if (selectedOrder.newStatus === 'delivered') {
+        setOrders(prev => prev.filter(order => order.id !== selectedOrder.id));
       } else {
-        setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
+        setOrders(prev => prev.map(order => order.id === selectedOrder.id ? { ...order, status: selectedOrder.newStatus } : order));
       }
+      setShowConfirmModal(false);
+      setSelectedOrder(null);
     } catch (err: any) {
       alert(err.message || 'Failed to update order status');
     }
+  };
+
+  const cancelStatusChange = () => {
+    setShowConfirmModal(false);
+    setSelectedOrder(null);
   };
 
   const filteredOrders = orders.filter(order => {
@@ -343,6 +365,67 @@ export default function AssignedOrderPage() {
           </div>
         </main>
       </div>
+
+      {/* Status Change Confirmation Modal */}
+      {showConfirmModal && selectedOrder && (
+        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 scale-100">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <FaExclamationTriangle className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Confirm Status Change</h3>
+                  <p className="text-sm text-slate-600">Order #{selectedOrder.orderNumber}</p>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="mb-6">
+                <p className="text-slate-700 mb-4">
+                  Are you sure you want to change the status from{' '}
+                  <span className="font-semibold text-slate-900 capitalize">{selectedOrder.currentStatus}</span> to{' '}
+                  <span className="font-semibold text-blue-600 capitalize">{selectedOrder.newStatus}</span>?
+                </p>
+                
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">Current Status:</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedOrder.currentStatus)}`}>
+                      {selectedOrder.currentStatus.charAt(0).toUpperCase() + selectedOrder.currentStatus.slice(1)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm text-slate-600">New Status:</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedOrder.newStatus)}`}>
+                      {selectedOrder.newStatus.charAt(0).toUpperCase() + selectedOrder.newStatus.slice(1)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelStatusChange}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmStatusChange}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 font-medium flex items-center justify-center space-x-2"
+                >
+                  <FaCheckCircle className="w-4 h-4" />
+                  <span>Confirm Change</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </ProtectedRoute>
   );
 } 

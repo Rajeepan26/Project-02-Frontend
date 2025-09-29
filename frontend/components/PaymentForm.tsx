@@ -74,8 +74,24 @@ export default function PaymentForm({ total, shipping, tax, onSuccess }: Payment
     else if (cardInfo.cardNumber.replace(/\s/g, '').length < 16) newErrors.cardNumber = 'Card number must be 16 digits';
     if (!cardInfo.expiryDate.trim()) newErrors.expiryDate = 'Expiry date is required';
     else if (!/^\d{2}\/\d{2}$/.test(cardInfo.expiryDate)) newErrors.expiryDate = 'Invalid expiry date format (MM/YY)';
-    if (!cardInfo.cvv.trim()) newErrors.cvv = 'CVV is required';
-    else if (cardInfo.cvv.length < 3) newErrors.cvv = 'CVV must be 3-4 digits';
+    else {
+      const [monthStr, yearStr] = cardInfo.expiryDate.split('/');
+      const month = parseInt(monthStr, 10);
+      const year = parseInt(yearStr, 10);
+      if (isNaN(month) || isNaN(year) || month < 1 || month > 12) {
+        newErrors.expiryDate = 'Month must be between 01 and 12';
+      } else {
+        // Get current month/year
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear() % 100;
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          newErrors.expiryDate = 'Expiry date cannot be in the past';
+        }
+      }
+    }
+  if (!cardInfo.cvv.trim()) newErrors.cvv = 'CVV is required';
+  else if (!/^\d{3}$/.test(cardInfo.cvv)) newErrors.cvv = 'CVV must be exactly 3 digits';
     if (!cardInfo.cardholderName.trim()) newErrors.cardholderName = 'Cardholder name is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -136,12 +152,14 @@ export default function PaymentForm({ total, shipping, tax, onSuccess }: Payment
         <div className="flex-1">
           <label className="block text-sm font-semibold text-slate-700 mb-2">CVV *</label>
           <input
-            type="text"
+            type="password"
             value={cardInfo.cvv}
-            onChange={e => setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/\D/g, '') })}
+            onChange={e => setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) })}
             className={`w-full px-5 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-lg bg-slate-50 ${errors.cvv ? 'border-red-400' : 'border-slate-200'}`}
-            placeholder="123"
-            maxLength={4}
+            placeholder="●●●"
+            maxLength={3}
+            inputMode="numeric"
+            autoComplete="cc-csc"
           />
           {errors.cvv && <p className="text-red-500 text-sm mt-1">{errors.cvv}</p>}
         </div>
